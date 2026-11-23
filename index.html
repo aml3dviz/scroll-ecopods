@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Scrollytelling</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b0b0a;--fg:#fff}
+*{box-sizing:border-box;margin:0}
+html,body{background:var(--bg);color:var(--fg);font-family:Inter,system-ui,sans-serif}
+#track{height:700vh;position:relative}
+#stage{position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden}
+.layer{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#imgA,#imgB,#vid{opacity:0}
+#imgA{opacity:1}
+.shade{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.55),rgba(0,0,0,0) 55%);opacity:0;transition:none;pointer-events:none}
+.txt{position:absolute;left:clamp(20px,5vw,72px);bottom:calc(clamp(28px,7vh,80px) + env(safe-area-inset-bottom,0px));max-width:min(720px,88vw);opacity:0;pointer-events:none}
+.txt .lab{font-weight:500;font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.85;margin-bottom:14px}
+.txt h2{font-weight:800;font-size:64px;line-height:1;letter-spacing:-.02em}
+.txt p{font-weight:400;font-size:16px;line-height:1.5;margin-top:16px;max-width:46ch;opacity:0}
+@media(max-width:600px){.txt h2{font-size:44px}}
+#hint{position:absolute;right:clamp(20px,5vw,72px);bottom:calc(28px + env(safe-area-inset-bottom,0px));font-weight:500;font-size:12px;letter-spacing:.14em;text-transform:uppercase;transition:opacity .4s}
+#bar{position:absolute;left:0;top:env(safe-area-inset-top,0px);height:2px;background:#fff;width:0;opacity:.8}
+</style></head><body>
+<div id="track">
+ <div id="stage">
+  <img id="imgA" class="layer" alt="Render 2A" src="assets/RENDER2A.jpg">
+  <video id="vid" class="layer" muted playsinline preload="auto" tabindex="-1"></video>
+  <img id="imgB" class="layer" alt="Render 6" src="assets/RENDER6.jpg">
+  <div class="shade" id="shade"></div>
+  <div class="txt" id="tA"><div class="lab">01 · Ubicación</div><h2>TÍTULO</h2><p>descripción</p></div>
+  <div class="txt" id="tB"><div class="lab">02 · Ubicación</div><h2>TÍTULO</h2><p>descripción</p></div>
+  <div id="hint">Scrolleá ↓</div>
+  <div id="bar"></div>
+ </div>
+</div>
+<script>
+(function(){
+var $=function(i){return document.getElementById(i)};
+var track=$('track'),vid=$('vid'),imgA=$('imgA'),imgB=$('imgB'),shade=$('shade'),
+tA=$('tA'),tB=$('tB'),hint=$('hint'),bar=$('bar');
+var clamp=function(x,a,b){return Math.max(a,Math.min(b,x))};
+var seg=function(p,a,b){return clamp((p-a)/(b-a),0,1)};
+var ease=function(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2};
+// Fases del scroll: frena en imagen A, video, frena en imagen B
+var P={aHold:[0,.38],vid:[.38,.58],bHold:[.58,1]};
+var dur=0,target=0,cur=0,ready=false;
+vid.src='assets/transicion.mp4';vid.load();
+vid.addEventListener('loadeddata',function(){ready=true;try{vid.currentTime=0.001}catch(e){}});
+vid.addEventListener('loadedmetadata',function(){dur=vid.duration;});
+function progress(){
+  var r=track.getBoundingClientRect(),max=track.offsetHeight-window.innerHeight;
+  return clamp(-r.top/max,0,1);
+}
+function setText(el,show,descShow){
+  el.style.opacity=show;
+  el.style.transform='translateY('+((1-show)*18)+'px)';
+  el.firstChild.nextSibling;
+  el.querySelector('p').style.opacity=descShow;
+}
+function render(){
+  var p=progress();
+  bar.style.width=(p*100)+'%';
+  hint.style.opacity=p<.04?1:0;
+  // video progress
+  var v=seg(p,P.vid[0],P.vid[1]);
+  target=v;cur+=(target-cur)*.35; if(Math.abs(target-cur)<.0005)cur=target;
+  if(ready&&dur&&vid.readyState>=1){
+    var t=clamp(cur*dur,0,dur-.04);
+    if(Math.abs(vid.currentTime-t)>.01 && !vid.seeking) vid.currentTime=t;
+  }
+  // capas: A -> video -> B (fundidos cortos en los bordes)
+  var toV=seg(p,P.aHold[1]-.02,P.aHold[1]+.015);
+  var toB=seg(p,P.bHold[0]-.015,P.bHold[0]+.02);
+  imgA.style.opacity=1-toV;
+  vid.style.opacity=ready?toV*(1-toB):0;
+  imgB.style.opacity=toB;
+  // textos: título primero, descripción después
+  var a=seg(p,.03,.06)*(1-seg(p,.33,.36));
+  var ad=seg(p,.07,.10)*(1-seg(p,.33,.36));
+  var b=seg(p,.62,.65), bd=seg(p,.66,.69);
+  setText(tA,ease(a),ease(ad)); setText(tB,ease(b),ease(bd));
+  var sh=Math.max(a,b)*.9; shade.style.opacity=sh;
+  // texto B abajo a la derecha para alternar
+  requestAnimationFrame(render);
+}
+tB.style.left='auto';tB.style.right='clamp(20px,5vw,72px)';tB.style.textAlign='right';
+requestAnimationFrame(render);
+})();
+</script></body></html>
